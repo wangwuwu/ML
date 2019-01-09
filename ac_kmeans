@@ -1,0 +1,56 @@
+import numpy as np
+import pandas as pd
+def findClosetCen(p,centers):#查找最近中心点
+    minDis=float('inf')
+    index=0
+    for k,v in enumerate(centers):
+        dis=np.linalg.norm(p-v)
+        if dis<minDis:
+            minDis=dis
+            index=k
+    return index
+def initCenters(dataset,k):
+    index=np.random.randint(len(dataset),size=k)
+    return dataset[index]
+def getMatr(x,u):
+    a=x-u
+    # print(a[None,:],'--',a.T[None,:])
+    res=np.dot(a[:,None],a[None,:])
+    return res
+def ac_kmeans(dataset,k):
+    centers=initCenters(dataset,k)
+    d=np.shape(dataset)[1]
+    m=d//2
+    us=np.mean(dataset,axis=0)#数据集各列均值（即中心坐标）
+    ss=np.array(list(map(lambda x:getMatr(x,us),dataset))).sum(axis=0)#dataset的散布矩阵
+    pc = np.vstack((np.eye(m), np.zeros((d - m, m))))
+    pn = np.vstack((np.zeros((m, d - m)), np.eye(d - m)))
+    temp=np.random.rand(d,d)
+    V,sigma,v=np.linalg.svd(temp)#奇异值分解获得正交矩阵
+    iters=0
+    Dis=1000
+    while iters<300 and Dis>1e-9:
+        iters+=1
+        # print(iters)
+        subs_centers=np.array(list(map(lambda x:np.dot(np.dot(pc.T,V.T),x[:,None]),centers)))#映射到聚类子空间
+        index=np.array(list(map(lambda x:findClosetCen(np.dot(np.dot(pc.T,V.T),x[:,None]),subs_centers),dataset)))#查找最近中心
+        # 计算新中心和每个簇的散布矩阵
+        newCenters=np.random.rand(k,d)
+        si=[]
+        for i in range(k):
+            temp=dataset[np.where(index==i)]
+            newCenters[i]=np.mean(temp,axis=0)
+            s=np.array(list(map(lambda x: getMatr(x, newCenters[i]), temp))).sum(axis=0)
+            si.append(s)
+        #更新V、m
+        tzz,V=np.linalg.eig(np.array(si).sum(axis=0)-ss)
+        sorted_indices=np.argsort(tzz)
+        V=V[sorted_indices]
+        m=len([i for i in tzz if i<0])
+        #收敛误差
+        Dis=0
+        for i in range(k):
+            Dis+=np.linalg.norm(centers[i]-newCenters[i])
+            centers[i]=newCenters[i]
+    return centers
+
